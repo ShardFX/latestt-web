@@ -110,7 +110,7 @@ valueBox(
 Row
 -----------------------------------------------------------------------
 
-### **Daily cumulative cases by type** (Pakistan only)
+### **Daily cumulative cases by type** (Malaysia)
     
 ```{r}
 plotly::plot_ly(data = df_daily) %>%
