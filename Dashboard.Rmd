@@ -7,7 +7,6 @@ output:
     #sodial: ["facebook", "twitter", "linkedin"]
     vertical_layout: fill
     
-runtime: shiny   
 ---
 
 ```{r setup, include=FALSE}
@@ -24,7 +23,6 @@ data(coronavirus)
 `%>%` <- magrittr::`%>%`
 #------------------ Parameters ------------------
 # Set colors
-# https://www.w3.org/TR/css-color-3/#svg-color
 confirmed_color <- "yellow"
 active_color <- "#1f77b4"
 recovered_color <- "forestgreen"
@@ -116,11 +114,9 @@ Row
 plotly::plot_ly(data = df_daily) %>%
   plotly::add_trace(
     x = ~date,
-    # y = ~active_cum,
     y = ~confirmed_cum,
     type = "scatter",
     mode = "lines+markers",
-    # name = "Active",
     name = "Confirmed",
     line = list(color = active_color),
     marker = list(color = active_color)
