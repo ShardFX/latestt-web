@@ -5,6 +5,7 @@ output:
     theme: united
     orientation: rows
     #sodial: ["facebook", "twitter", "linkedin"]
+    source_code: embed
     vertical_layout: fill
     
 runtime: shiny   
@@ -17,10 +18,9 @@ library(flexdashboard)
 # devtools::install_github("RamiKrispin/coronavirus", force = TRUE)
 library(coronavirus)
 data(coronavirus)
-library(tidyverse)
-#update_datasets()
-View(coronavirus)
-max(coronavirus$date)
+# update_datasets()
+# View(coronavirus)
+# max(coronavirus$date)
 
 `%>%` <- magrittr::`%>%`
 #------------------ Parameters ------------------
@@ -31,8 +31,6 @@ active_color <- "#1f77b4"
 recovered_color <- "forestgreen"
 death_color <- "red"
 #------------------ Data ------------------
-
-
 df <- coronavirus %>%
   # dplyr::filter(date == max(date)) %>%
   dplyr::filter(country == "Malaysia") %>%
@@ -42,7 +40,6 @@ df <- coronavirus %>%
     names_from = type,
     values_from = total
   ) %>%
-  
   # dplyr::mutate(unrecovered = confirmed - ifelse(is.na(recovered), 0, recovered) - ifelse(is.na(death), 0, death)) %>%
   dplyr::mutate(unrecovered = confirmed - ifelse(is.na(death), 0, death)) %>%
   dplyr::arrange(-confirmed) %>%
@@ -61,7 +58,6 @@ df_daily <- coronavirus %>%
     names_from = type,
     values_from = total
   ) %>%
-  
   dplyr::arrange(date) %>%
   dplyr::ungroup() %>%
   #dplyr::mutate(active = confirmed - death - recovered) %>%
@@ -72,6 +68,7 @@ df_daily <- coronavirus %>%
     # recovered_cum = cumsum(recovered),
     active_cum = cumsum(active)
   )
+
 
 df1 <- coronavirus %>% dplyr::filter(date == max(date))
 ```
@@ -109,10 +106,12 @@ valueBox(
   color = death_color
 )
 ```
+
+
 Row
 -----------------------------------------------------------------------
 
-### **Daily cumulative cases by type** (Malaysia)
+### **Daily cumulative cases by type** (Pakistan only)
     
 ```{r}
 plotly::plot_ly(data = df_daily) %>%
@@ -207,36 +206,36 @@ daily_confirmed <- coronavirus %>%
   dplyr::summarise(total = sum(cases)) %>%
   dplyr::ungroup() %>%
   tidyr::pivot_wider(names_from = country, values_from = total)
-#----------------------------------------
 
+#----------------------------------------
 # Plotting the data
 
 daily_confirmed %>%
   plotly::plot_ly() %>%
   plotly::add_trace(
     x = ~date,
-    y = ~Pakistan,
+    y = ~Malaysia,
     type = "scatter",
     mode = "lines+markers",
     name = "Malaysia"
   ) %>%
   plotly::add_trace(
     x = ~date,
-    y = ~India,
+    y = ~Brunei,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "IBrunei"
+  ) %>%
+  plotly::add_trace(
+    x = ~date,
+    y = ~Singapore,
     type = "scatter",
     mode = "lines+markers",
     name = "Singapore"
   ) %>%
   plotly::add_trace(
     x = ~date,
-    y = ~Afghanistan,
-    type = "scatter",
-    mode = "lines+markers",
-    name = "Brunei"
-  ) %>%
-  plotly::add_trace(
-    x = ~date,
-    y = ~Bangladesh,
+    y = ~Thailand,
     type = "scatter",
     mode = "lines+markers",
     name = "Thailand"
@@ -259,15 +258,15 @@ daily_confirmed %>%
     )
   )
 ```
-
+ 
 ### **Cases distribution by type**
 
 ```{r daily_summary}
 df_EU <- coronavirus %>%
   # dplyr::filter(date == max(date)) %>%
   dplyr::filter(country == "Malaysia" |
-    country == "Singapore" |
     country == "Brunei" |
+    country == "Singapore" |
     country == "Thailand") %>%
   dplyr::group_by(country, type) %>%
   dplyr::summarise(total = sum(cases)) %>%
@@ -279,7 +278,7 @@ df_EU <- coronavirus %>%
   dplyr::mutate(unrecovered = confirmed - ifelse(is.na(death), 0, death)) %>%
   dplyr::arrange(confirmed) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(country = dplyr::if_else(country == "United Arab Emirates", "UAE", country)) %>%
+  dplyr::mutate(country = dplyr::if_else(country== "United Arab Emirates", "UAE", country)) %>%
   dplyr::mutate(country = dplyr::if_else(country == "Mainland China", "China", country)) %>%
   dplyr::mutate(country = dplyr::if_else(country == "North Macedonia", "N.Macedonia", country)) %>%
   dplyr::mutate(country = trimws(country)) %>%
@@ -317,3 +316,7 @@ plotly::plot_ly(
     )
   )
 ```
+
+
+
+
