@@ -25,7 +25,7 @@ data(coronavirus)
 #------------------ Parameters ------------------
 # Set colors
 # https://www.w3.org/TR/css-color-3/#svg-color
-confirmed_color <- "purple"
+confirmed_color <- "yellow"
 active_color <- "#1f77b4"
 recovered_color <- "forestgreen"
 death_color <- "red"
@@ -153,8 +153,8 @@ plotly::plot_ly(data = df_daily) %>%
     text = paste("First death"),
     xref = "x",
     yref = "y",
-    arrowhead = 5,
-    arrowhead = 3,
+    arrowhead = 4,
+    arrowhead = 2,
     arrowsize = 1,
     showarrow = TRUE,
     ax = -90,
