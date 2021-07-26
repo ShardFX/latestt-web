@@ -92,6 +92,18 @@ valueBox(
 )
 ```
 
+
+### recovered {.value-box}
+
+```{r}
+valueBox(
+  value = paste(format(sum(df$recovered), big.mark = ","), "", sep = " "),
+  caption = "Total recovered cases",
+  icon = "fas fa-user-md",
+  color = recovered_color
+)
+```
+
 ### death {.value-box}
 
 ```{r}
