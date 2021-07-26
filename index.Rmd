@@ -1,0 +1,20 @@
+---
+title: " COVID-19"
+image: "logo4.jpg"
+
+  
+output:
+  postcards::jolla_blue
+site: distill::distill_website
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# Learn more about creating websites with Distill at:
+# https://rstudio.github.io/distill/website.html
+
+```
+
+
+TEMPERATURE AND MOVEMENT TRACKING
