@@ -285,7 +285,11 @@ daily_confirmed %>%
     )
   )
 ```
- 
+
+
+ Row
+-----------------------------------------------------------------------
+
 ### **Cases distribution by type**
 
 ```{r daily_summary}
