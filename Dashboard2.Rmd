@@ -1,0 +1,235 @@
+---
+title: "Coronavirus Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    social: menu
+    source_code: embed
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+#------------------ Packages ------------------
+library(flexdashboard)
+
+
+`%>%` <- magrittr::`%>%`
+#------------------ Parameters ------------------
+# Set colors
+# https://www.w3.org/TR/css-color-3/#svg-color
+confirmed_color <- "purple"
+active_color <- "#1f77b4"
+recovered_color <- "forestgreen"
+death_color <- "red"
+#------------------ Data ------------------
+df <- read.csv("https://raw.githubusercontent.com/RamiKrispin/coronavirus/master/csv/coronavirus.csv", stringsAsFactors = FALSE) %>%
+  dplyr::mutate(country = ifelse(country == "United Arab Emirates", "UAE", country),
+                country = ifelse(country == "Mainland China", "China", country),
+                country = ifelse(country == "North Macedonia", "N.Macedonia", country),
+                country = trimws(country),
+                country = factor(country, levels = unique(country)))
+
+
+df_daily <- df %>% 
+  dplyr::group_by(date, type) %>%
+  dplyr::summarise(total = sum(cases, na.rm = TRUE),
+                   .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = type,
+                     values_from = total) %>%
+  dplyr::arrange(date) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(active =  confirmed - death - recovered) %>%
+  dplyr::mutate(confirmed_cum = cumsum(confirmed),
+                death_cum = cumsum(death),
+                recovered_cum = cumsum(recovered),
+                active_cum = cumsum(active))
+
+
+df_tree <- df %>%
+  dplyr::group_by(country, type) %>%
+  dplyr::summarise(total = sum(cases), .groups = "drop") %>%
+  dplyr::mutate(type = ifelse(type == "confirmed", "Confirmed", type),
+                type = ifelse(type == "recovered", "Recovered", type),
+                type = ifelse(type == "death", "Death", type)) %>%
+  tidyr::pivot_wider(names_from = type, values_from = total) %>%
+  dplyr::mutate(Active = Confirmed - Death - Recovered) %>%
+  tidyr::pivot_longer(cols = -country, names_to = "type", values_to = "total")
+
+df_world <- df_tree %>%
+  dplyr::group_by(type) %>%
+  dplyr::summarise(total = sum(total), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = type, values_from = total)
+
+names(df_world) <- tolower(names(df_world))
+
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+### confirmed {.value-box}
+
+```{r}
+
+valueBox(value = paste(format(df_world$confirmed, big.mark = ","), "", sep = " "), 
+         caption = "Total Confirmed Cases", 
+         icon = "fas fa-user-md", 
+         color = confirmed_color)
+```
+
+
+### active {.value-box}
+
+```{r}
+valueBox(value = paste(format(df_world$active[1], big.mark = ","), " (",
+                       round(100 * df_world$active[1] / df_world$confirmed[1], 1), 
+                       "%)", sep = ""), 
+         caption = "Active Cases", icon = "fas fa-ambulance", 
+         color = active_color)
+```
+
+### recovered {.value-box}
+
+```{r}
+valueBox(value = paste(format(df_world$recovered[1] , big.mark = ","), " (",
+                       round(100 * df_world$recovered[1] / df_world$confirmed[1], 1), 
+                       "%)", sep = ""), 
+         caption = "Recovered Cases", icon = "fas fa-heartbeat", 
+         color = recovered_color)
+```
+
+### death {.value-box}
+
+```{r}
+
+valueBox(value = paste(format(df_world$death[1] , big.mark = ","), " (",
+                       round(100 * df_world$death[1] / df_world$confirmed[1], 1), 
+                       "%)", sep = ""),
+         caption = "Death Cases", 
+         icon = "fas fa-heart-broken", 
+         color = death_color)
+```
+
+
+Row {.tabset}
+-----------------------------------------------------------------------
+
+### Cases Distribution by Type (`r  max(df$date)`)
+
+```{r daily_summary}
+
+
+plotly::plot_ly(
+  data = df_tree %>% dplyr::filter(type == "Confirmed"),
+  type= "treemap",
+  values = ~total,
+  labels= ~ country,
+  parents=  ~type,
+  domain = list(column=0),
+  name = "Confirmed",
+  textinfo="label+value+percent parent"
+) %>%
+  plotly::add_trace(
+    data = df_tree %>% dplyr::filter(type == "Active"),
+    type= "treemap",
+    values = ~total,
+    labels= ~ country,
+    parents=  ~type,
+    domain = list(column=1),
+    name = "Active",
+    textinfo="label+value+percent parent"
+  ) %>%
+  plotly::add_trace(
+    data = df_tree %>% dplyr::filter(type == "Recovered"),
+    type= "treemap",
+    values = ~total,
+    labels= ~ country,
+    parents=  ~type,
+    domain = list(column=2),
+    name = "Recovered",
+    textinfo="label+value+percent parent"
+  ) %>%
+  plotly::add_trace(
+    data = df_tree %>% dplyr::filter(type == "Death"),
+    type= "treemap",
+    values = ~total,
+    labels= ~ country,
+    parents=  ~type,
+    domain = list(column=3),
+    name = "Death",
+    textinfo="label+value+percent parent"
+  ) %>%
+  plotly::layout(grid=list(columns=4, rows=1))
+  
+
+  
+
+
+```
+
+### Daily Cumulative Cases
+    
+```{r}
+plotly::plot_ly(data = df_daily,
+                x = ~ date,
+                y = ~ active_cum, 
+                name = 'Active', 
+                fillcolor = active_color,
+                type = 'scatter',
+                mode = 'none', 
+                stackgroup = 'one') %>%
+  plotly::add_trace(y = ~ recovered_cum,
+                    name = "Recovered",
+                    fillcolor = recovered_color) %>%
+  plotly::add_trace(y = ~ death_cum,
+                    name = "Death",
+                    fillcolor = death_color) %>%
+  plotly::layout(title = "",
+                 yaxis = list(title = "Cumulative Number of Cases"),
+                 xaxis = list(title = "Date",
+                              type = "date"),
+                 legend = list(x = 0.1, y = 0.9),
+                 hovermode = "compare")
+
+```
+
+
+
+
+### Recovery/Death Ratio
+
+```{r}
+df %>% 
+  
+  dplyr::group_by(country, type) %>%
+  dplyr::summarise(total_cases = sum(cases)) %>%
+  tidyr::pivot_wider(names_from = type, values_from = total_cases) %>%
+  dplyr::arrange(- confirmed) %>%
+  dplyr::filter(confirmed >= 20000) %>%
+  dplyr::mutate(recover_rate = recovered / confirmed,
+                death_rate = death / confirmed) %>% 
+  dplyr::mutate(recover_rate = dplyr::if_else(is.na(recover_rate), 0, recover_rate),
+                death_rate = dplyr::if_else(is.na(death_rate), 0, death_rate)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(confirmed_normal = as.numeric(confirmed) / max(as.numeric(confirmed))) %>%
+  plotly::plot_ly(y = ~ round(100 * recover_rate, 1),
+                  x = ~ round(100 * death_rate, 1),
+                  size = ~  log(confirmed),
+                  sizes = c(5, 70),
+                  type = 'scatter', mode = 'markers',
+                  color = ~ country,
+                  marker = list(sizemode = 'diameter' , opacity = 0.5),
+                  hoverinfo = 'text',
+                  text = ~paste("", country, 
+                                " Confirmed Cases: ", confirmed,
+                                " Recovery Rate: ", paste(round(100 * recover_rate, 1), "%", sep = ""),
+                                " Death Rate: ",  paste(round(100 * death_rate, 1), "%", sep = ""))
+                 ) %>%
+  plotly::layout(title = "Recovery / Death Ratio (Countries with More than 20,000 Cases)",
+    yaxis = list(title = "Recovery Rate", ticksuffix = "%"),
+                xaxis = list(title = "Death Rate", ticksuffix = "%", 
+                             dtick = 1, 
+                             tick0 = 0),
+                hovermode = "compare")
+```

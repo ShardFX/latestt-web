@@ -28,6 +28,8 @@ active_color <- "#1f77b4"
 recovered_color <- "forestgreen"
 death_color <- "red"
 #------------------ Data ------------------
+
+
 df <- coronavirus %>%
   # dplyr::filter(date == max(date)) %>%
   dplyr::filter(country == "Malaysia") %>%
@@ -62,15 +64,33 @@ df_daily <- coronavirus %>%
   dplyr::mutate(
     confirmed_cum = cumsum(confirmed),
     death_cum = cumsum(death),
-    # recovered_cum = cumsum(recovered),
+    recovered_cum = cumsum(recovered),
     active_cum = cumsum(active)
   )
+
+df_tree <- coronavirus %>%
+  #dplyr::filter(country == "Malaysia") %>%
+  dplyr::group_by(country, type) %>%
+  dplyr::summarise(total = sum(cases), .groups = "drop") %>%
+  dplyr::mutate(type = ifelse(type == "confirmed", "Confirmed", type),
+                type = ifelse(type == "recovered", "Recovered", type),
+                type = ifelse(type == "death", "Death", type)) %>%
+  tidyr::pivot_wider(names_from = type, values_from = total) %>%
+  dplyr::mutate(Active = Confirmed - Death - Recovered) %>%
+  tidyr::pivot_longer(cols = -country, names_to = "type", values_to = "total")
+
+df_world <- df_tree %>%
+  dplyr::group_by(type) %>%
+  dplyr::summarise(total = sum(total), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = type, values_from = total)
+
+names(df_world) <- tolower(names(df_world))
 
 
 df1 <- coronavirus %>% dplyr::filter(date == max(date))
 ```
 
-Summary
+Daily Statistics
 =======================================================================
 
 Row {data-width=400}
@@ -86,18 +106,18 @@ valueBox(
   icon = "fas fa-user-md",
   color = confirmed_color
 )
+
 ```
+
 
 ### recovered {.value-box}
 
 ```{r}
-
-valueBox(
-  value = paste(format(sum(df$recovered), big.mark = ","), "", sep = " "),
-  caption = "Total Recovered cases",
-  icon = "fas fa-user-md",
-  color = recovered_color
-)
+valueBox(value = paste(format(df$recovered[1] , big.mark = ","), " (",
+                       round(100 * df$recovered[1] / df$confirmed[1], 1), 
+                       "%)", sep = ""), 
+         caption = "Recovered Cases", icon = "fas fa-heartbeat", 
+         color = recovered_color)
 ```
 
 ### death {.value-box}
@@ -124,15 +144,29 @@ Row
     
 ```{r}
 plotly::plot_ly(data = df_daily) %>%
+
+  
   plotly::add_trace(
     x = ~date,
-    y = ~confirmed_cum,
+    y = ~active_cum,
     type = "scatter",
     mode = "lines+markers",
-    name = "Confirmed",
+    name = "Active",
     line = list(color = active_color),
     marker = list(color = active_color)
   ) %>%
+  
+  plotly::add_trace(
+    x = ~date,
+    y = ~recovered_cum,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Recovered",
+    line = list(color = recovered_color),
+    marker = list(color = recovered_color)
+  ) %>%
+  
+  
   plotly::add_trace(
     x = ~date,
     y = ~death_cum,
@@ -142,6 +176,8 @@ plotly::plot_ly(data = df_daily) %>%
     line = list(color = death_color),
     marker = list(color = death_color)
   ) %>%
+  
+  
   plotly::add_annotations(
     x = as.Date("2020-03-11"),
     y = 3,
@@ -309,6 +345,115 @@ plotly::plot_ly(
   )
 ```
 
+Recovery/Death Ratio
+=======================================================================
 
 
+Column {data-width=400}
+-------------------------------------
 
+### Recovery/Death Ratio
+
+```{r}
+
+coronavirus %>% 
+  
+  dplyr::group_by(country, type) %>%
+  dplyr::summarise(total_cases = sum(cases)) %>%
+  tidyr::pivot_wider(names_from = type, values_from = total_cases) %>%
+  dplyr::arrange(- confirmed) %>%
+  dplyr::filter(confirmed >= 20000) %>%
+  dplyr::mutate(recover_rate = recovered / confirmed,
+                death_rate = death / confirmed) %>% 
+  dplyr::mutate(recover_rate = dplyr::if_else(is.na(recover_rate), 0, recover_rate),
+                death_rate = dplyr::if_else(is.na(death_rate), 0, death_rate)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(confirmed_normal = as.numeric(confirmed) / max(as.numeric(confirmed))) %>%
+  plotly::plot_ly(y = ~ round(100 * recover_rate, 1),
+                  x = ~ round(100 * death_rate, 1),
+                  size = ~  log(confirmed),
+                  sizes = c(5, 70),
+                  type = 'scatter', mode = 'markers',
+                  color = ~ country,
+                  marker = list(sizemode = 'diameter' , opacity = 0.5),
+                  hoverinfo = 'text',
+                  text = ~paste("", country, 
+                                " Confirmed Cases: ", confirmed,
+                                " Recovery Rate: ", paste(round(100 * recover_rate, 1), "%", sep = ""),
+                                " Death Rate: ",  paste(round(100 * death_rate, 1), "%", sep = ""))
+                 ) %>%
+  plotly::layout(title = "Recovery / Death Ratio (Countries with More than 20,000 Cases)",
+    yaxis = list(title = "Recovery Rate", ticksuffix = "%"),
+                xaxis = list(title = "Death Rate", ticksuffix = "%", 
+                             dtick = 1, 
+                             tick0 = 0),
+                hovermode = "compare")
+```
+
+Summary
+=======================================================================
+
+
+Column {data-width=400}
+-------------------------------------
+### Data
+
+
+```{r}
+df_rates <- df_tree %>%
+  dplyr::filter(type != "Active") %>%
+  tidyr::pivot_wider(names_from = "type", values_from = "total") %>%
+  dplyr::mutate(recovery_rate = Recovered / Confirmed,
+    death_rate = Death / Confirmed) 
+
+
+bar_chart <- function(label, width = "100%", height = "14px", fill = "#00bfc4", background = NULL) {
+  bar <- htmltools::div(style = list(background = fill, width = width, height = height))
+  chart <- htmltools::div(style = list(flexGrow = 1, marginLeft = "6px", background = background), bar)
+  htmltools::div(style = list(display = "flex", alignItems = "center"), label, chart)
+}
+
+tbl <- reactable::reactable(df_rates,
+                     pagination = FALSE,
+                     highlight = TRUE,
+                     height = 400,
+                     sortable = TRUE,
+                     borderless = TRUE,
+                     defaultPageSize = nrow(df_rates),
+                      defaultSortOrder = "desc",
+                     defaultSorted = "Confirmed",
+                     columns = list(
+                       country = reactable::colDef(name = "Country", minWidth = 50, maxWidth = 100),
+                       Confirmed = reactable::colDef(name = "Confirmed",  minWidth = 50, maxWidth = 100, defaultSortOrder = "desc"),
+                       Recovered = reactable::colDef(name = "Recovered",  minWidth = 50, maxWidth = 100),
+                       Death = reactable::colDef(name = "Death",  minWidth = 50, maxWidth = 100),
+                       recovery_rate = reactable::colDef(name = "Recovery Rate",  minWidth = 50, maxWidth = 200,
+                                                        defaultSortOrder = "desc",
+                                                      cell = function(value) {
+                                                        # Format as percentages with 1 decimal place
+                                                        value <- paste0(format(round(value * 100, 2), nsmall = 1), "%")
+                                                        bar_chart(value, width = value, fill = "green", background = "#e1e1e1")
+                                                      },
+                       align = "left"),
+                       death_rate = reactable::colDef(name = "Death Rate",  
+                                                      minWidth = 50, maxWidth = 200,
+                                                      defaultSortOrder = "desc",
+                                                      cell = function(value) {
+                                                        # Format as percentages with 1 decimal place
+                                                        value <- paste0(format(round(value * 100, 2), nsmall = 1), "%")
+                                                        bar_chart(value, width = value, fill = "red", background = "#e1e1e1")
+                                                      },
+                       align = "left"))
+)
+
+library(htmltools)
+htmltools::div(class = "standings", 
+  htmltools::div(class = "title",
+    htmltools::h2("Total Number of Covid19 Cases in Malaysia"),
+    "Clich on the columns names to resort the table"
+  ),
+  tbl,
+  paste("Data last updated on", max(df1$date))
+)
+
+```
