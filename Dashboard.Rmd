@@ -16,18 +16,18 @@ library(flexdashboard)
 # devtools::install_github("RamiKrispin/coronavirus", force = TRUE)
 library(coronavirus)
 data(coronavirus)
+# update_datasets()
 # View(coronavirus)
 # max(coronavirus$date)
+
 `%>%` <- magrittr::`%>%`
 #------------------ Parameters ------------------
 # Set colors
-# https://www.w3.org/TR/css-color-3/#svg-color
 confirmed_color <- "yellow"
 active_color <- "#1f77b4"
 recovered_color <- "forestgreen"
 death_color <- "red"
 #------------------ Data ------------------
-
 df <- coronavirus %>%
   # dplyr::filter(date == max(date)) %>%
   dplyr::filter(country == "Malaysia") %>%
@@ -37,10 +37,7 @@ df <- coronavirus %>%
     names_from = type,
     values_from = total
   ) %>%
-  
   # dplyr::mutate(unrecovered = confirmed - ifelse(is.na(recovered), 0, recovered) - ifelse(is.na(death), 0, death)) %>%
-  
-  
   dplyr::mutate(unrecovered = confirmed - ifelse(is.na(death), 0, death)) %>%
   dplyr::arrange(-confirmed) %>%
   dplyr::ungroup() %>%
@@ -49,6 +46,7 @@ df <- coronavirus %>%
   dplyr::mutate(country = dplyr::if_else(country == "North Macedonia", "N.Macedonia", country)) %>%
   dplyr::mutate(country = trimws(country)) %>%
   dplyr::mutate(country = factor(country, levels = country))
+
 df_daily <- coronavirus %>%
   dplyr::filter(country == "Malaysia") %>%
   dplyr::group_by(date, type) %>%
@@ -59,18 +57,15 @@ df_daily <- coronavirus %>%
   ) %>%
   dplyr::arrange(date) %>%
   dplyr::ungroup() %>%
-  
-  
   #dplyr::mutate(active = confirmed - death - recovered) %>%
-  
   dplyr::mutate(active = confirmed - death) %>%
   dplyr::mutate(
     confirmed_cum = cumsum(confirmed),
     death_cum = cumsum(death),
-    
     # recovered_cum = cumsum(recovered),
     active_cum = cumsum(active)
   )
+
 
 df1 <- coronavirus %>% dplyr::filter(date == max(date))
 ```
@@ -84,6 +79,7 @@ Row {data-width=400}
 ### confirmed {.value-box}
 
 ```{r}
+
 valueBox(
   value = paste(format(sum(df$confirmed), big.mark = ","), "", sep = " "),
   caption = "Total confirmed cases",
@@ -92,13 +88,13 @@ valueBox(
 )
 ```
 
-
 ### recovered {.value-box}
 
 ```{r}
+
 valueBox(
   value = paste(format(sum(df$recovered), big.mark = ","), "", sep = " "),
-  caption = "Total recovered cases",
+  caption = "Total Recovered cases",
   icon = "fas fa-user-md",
   color = recovered_color
 )
@@ -107,6 +103,7 @@ valueBox(
 ### death {.value-box}
 
 ```{r}
+
 valueBox(
   value = paste(format(sum(df$death, na.rm = TRUE), big.mark = ","), " (",
     round(100 * sum(df$death, na.rm = TRUE) / sum(df$confirmed), 1),
@@ -119,6 +116,7 @@ valueBox(
 )
 ```
 
+
 Row
 -----------------------------------------------------------------------
 
@@ -128,11 +126,9 @@ Row
 plotly::plot_ly(data = df_daily) %>%
   plotly::add_trace(
     x = ~date,
-    # y = ~active_cum,
     y = ~confirmed_cum,
     type = "scatter",
     mode = "lines+markers",
-    # name = "Active",
     name = "Confirmed",
     line = list(color = active_color),
     marker = list(color = active_color)
@@ -146,21 +142,6 @@ plotly::plot_ly(data = df_daily) %>%
     line = list(color = death_color),
     marker = list(color = death_color)
   ) %>%
-  
-  # plotly::add_annotations(
-  #   x = as.Date("2020-02-04"),
-  #   y = 1,
-  #   text = paste("First case"),
-  #   xref = "x",
-  #   yref = "y",
-  #   arrowhead = 5,
-  #   arrowhead = 3,
-  #   arrowsize = 1,
-  #   showarrow = TRUE,
-  #   ax = -10,
-  #   ay = -90
-  # ) %>%
-
   plotly::add_annotations(
     x = as.Date("2020-03-11"),
     y = 3,
@@ -206,7 +187,7 @@ Column {data-width=400}
 -------------------------------------
 
 
-### **Daily new confirmed cases**
+### **Daily new cases**
     
 ```{r}
 daily_confirmed <- coronavirus %>%
@@ -217,8 +198,10 @@ daily_confirmed <- coronavirus %>%
   dplyr::summarise(total = sum(cases)) %>%
   dplyr::ungroup() %>%
   tidyr::pivot_wider(names_from = country, values_from = total)
+
 #----------------------------------------
 # Plotting the data
+
 daily_confirmed %>%
   plotly::plot_ly() %>%
   plotly::add_trace(
@@ -228,20 +211,6 @@ daily_confirmed %>%
     mode = "lines+markers",
     name = "Malaysia"
   ) %>%
-  # plotly::add_trace(
-  #   x = ~date,
-  #   y = ~France,
-  #   type = "scatter",
-  #   mode = "lines+markers",
-  #   name = "France"
-  # ) %>%
-  # plotly::add_trace(
-  #   x = ~date,
-  #   y = ~Spain,
-  #   type = "scatter",
-  #   mode = "lines+markers",
-  #   name = "Spain"
-  # ) %>%
   plotly::add_trace(
     x = ~date,
     y = ~Brunei,
@@ -265,8 +234,8 @@ daily_confirmed %>%
   ) %>%
   plotly::layout(
     title = "",
-    legend = list(x = 0.7, y = 0.9),
-    yaxis = list(title = "New confirmed cases"),
+    legend = list(x = 0.1, y = 0.9),
+    yaxis = list(title = "Number of new cases"),
     xaxis = list(title = "Date"),
     # paper_bgcolor = "black",
     # plot_bgcolor = "black",
@@ -281,7 +250,7 @@ daily_confirmed %>%
     )
   )
 ```
-
+ 
 ### **Cases distribution by type**
 
 ```{r daily_summary}
@@ -297,17 +266,16 @@ df_EU <- coronavirus %>%
     names_from = type,
     values_from = total
   ) %>%
-  
   # dplyr::mutate(unrecovered = confirmed - ifelse(is.na(recovered), 0, recovered) - ifelse(is.na(death), 0, death)) %>%
-  
   dplyr::mutate(unrecovered = confirmed - ifelse(is.na(death), 0, death)) %>%
   dplyr::arrange(confirmed) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(country = dplyr::if_else(country == "United Arab Emirates", "UAE", country)) %>%
+  dplyr::mutate(country = dplyr::if_else(country== "United Arab Emirates", "UAE", country)) %>%
   dplyr::mutate(country = dplyr::if_else(country == "Mainland China", "China", country)) %>%
   dplyr::mutate(country = dplyr::if_else(country == "North Macedonia", "N.Macedonia", country)) %>%
   dplyr::mutate(country = trimws(country)) %>%
   dplyr::mutate(country = factor(country, levels = country))
+
 plotly::plot_ly(
   data = df_EU,
   x = ~country,
@@ -340,3 +308,7 @@ plotly::plot_ly(
     )
   )
 ```
+
+
+
+

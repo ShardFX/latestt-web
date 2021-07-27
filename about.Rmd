@@ -1,10 +1,39 @@
 ---
-title: "OVERVIEW"
-description: |
- 
+title: "Overview"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: united
+    orientation: rows
+    #sodial: ["facebook", "twitter", "linkedin"]
+    vertical_layout: fill
+    
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
+
+**THE CORONAVIRUS DASHBOARD: THE CASE OF MALAYSIA**
+
+This dashboard is built with R using the R Markdown framework.
+
+**Code**
+
+The code behind this dashboard is available on [GitHub](https://github.com/gojorina/latestt-web){target="_blank"}.
+
+**Data**
+
+The input data for this dashboard is the dataset available from the [`{coronavirus}`](https://github.com/RamiKrispin/coronavirus){target="_blank"} R package. 
+
+```
+install.packages("devtools")
+devtools::install_github("RamiKrispin/coronavirus")
+```
+
+The statistics and the dashboard are updated on a daily basis.
+
+The raw data is pulled from the Johns Hopkins University Center for Systems Science and Engineering (JHU CCSE) Coronavirus [repository](https://github.com/RamiKrispin/coronavirus-csv){target="_blank"}.
+
+
+Sample plots can be found in this [article](https://rpubs.com/ShardFX/sidpg1).
