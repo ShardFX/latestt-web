@@ -453,7 +453,8 @@ htmltools::div(class = "standings",
     "Clich on the columns names to resort the table"
   ),
   tbl,
-  paste("Data last updated on", max(df1$date))
+  paste("",
+  "Data last updated on", max(df1$date))
 )
 
 ```
