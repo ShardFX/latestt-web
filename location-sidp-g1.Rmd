@@ -1,0 +1,99 @@
+---
+title: "location sidp g1"
+author: "Anwar Haikal Ruslan"
+date: "7/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+## location
+
+```{r, include=FALSE, message=FALSE}
+## Setup
+setwd("C:/UTP/Semester 8 - May 2021/EDB4703 - Systems Integration Design Project")
+
+library(fireData)
+library(plotly)
+library(tidyverse)
+#library(data.table)
+#library(rsconnect)
+library(Amelia)
+library("imputeTS")
+library(tidyquant)
+```
+
+```{r, include=FALSE}
+# Firebase
+token <- anonymous_login(project_api = "AIzaSyCUP3n1nPRtkOsdxiEJO_onqUkTCUCRV1E")
+
+# MapBox
+mapboxToken <- "pk.eyJ1Ijoic2hhcmRmeCIsImEiOiJja3F5NW92ODMxNTFrMm5sZmZ6aHRydWx6In0.3nyrkR9ke5BF9TPK0rg29g"
+Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+
+```
+
+##  data
+```{r, include=FALSE}
+data <- download(projectURL = "https://dashboard-b4f45-default-rtdb.asia-southeast1.firebasedatabase.app/", fileName = "UserLocation")
+```
+
+
+## Plot Location History
+```{r}
+#plot(data)
+df <- data.frame(matrix(unlist(data), nrow=length(data), byrow=TRUE))
+colnames(df) <- c("latitude","longitude", "name", "timestamp", "uid")
+df$latitude <- as.double(df$latitude)
+df$longitude <- as.double(df$longitude)
+df$name <- as.factor(df$name)
+df$timestamp <- as.POSIXct(df$timestamp)
+df$uid <- as.factor(df$uid)
+
+# Remove null values
+df <- df[!(is.na(df$latitude) | df$latitude==0), ]
+df <- df[!(is.na(df$longitude) | df$longitude==0), ]
+df <- df[!(is.na(df$name) | df$name=="null"), ]
+df <- df[!(is.na(df$timestamp) | df$timestamp<'2021-01-01'), ]
+df <- df[!(is.na(df$uid) | df$uid=="null"), ]
+
+summary(df)
+```
+
+
+## Plot 
+```{r}
+# Frequency of names
+fig <- plot_ly(data = df, x = df$name, type="histogram")
+fig <- fig %>% layout(title = 'Frequency of Names',
+         xaxis = list(title = 'Names'),
+         yaxis = list(title = 'Frequency')
+         )
+fig
+```
+
+```{r}
+#plot(data)
+
+# maps
+dat <- map_data("world", "Malaysia") 
+dat <- dat %>% group_by(group)
+
+
+map <- df %>% plot_mapbox(lat = ~latitude, lon = ~longitude, size=2,
+              mode = 'scattermapbox',  text = ~paste("Time: ", timestamp, "<br>UID:", uid), color=~name)
+map <- map %>% layout(
+         title = 'User Location History',
+         dragmode=FALSE,
+         mapbox=list(
+              style="carto-positron",
+              zoom =4.2,
+              center=list(lon=108, lat=4.8))
+         ) 
+
+map <- map %>% config(mapboxAccessToken = Sys.getenv("MAPBOX_TOKEN"))
+
+map
+```

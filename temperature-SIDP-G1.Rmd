@@ -1,0 +1,75 @@
+---
+title: "temperature SIDP"
+author: "Anwar Haikal Ruslan"
+date: "7/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+## WIFI
+
+```{r, include=FALSE, message=FALSE}
+## Setup
+setwd("C:/UTP/Semester 8 - May 2021/EDB4703 - Systems Integration Design Project")
+
+library(fireData)
+library(plotly)
+library(tidyverse)
+#library(data.table)
+#library(rsconnect)
+library(Amelia)
+library("imputeTS")
+library(tidyquant)
+```
+
+```{r, include=FALSE}
+# Firebase
+token <- anonymous_login(project_api = "AIzaSyCUP3n1nPRtkOsdxiEJO_onqUkTCUCRV1E")
+
+# MapBox
+mapboxToken <- "pk.eyJ1Ijoic2hhcmRmeCIsImEiOiJja3F5NW92ODMxNTFrMm5sZmZ6aHRydWx6In0.3nyrkR9ke5BF9TPK0rg29g"
+Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+
+# ShinyApps
+#rsconnect::setAccountInfo(name='shardfx',
+#			  token='37C7FD76A2B2205839A192482758244E',
+#			  secret='0mc41UMNDOm0o1giVSkt5bEj7ubN08RdGSd6204C')
+```
+
+##  data
+```{r, include=FALSE}
+data <- download(projectURL = "https://dashboard-b4f45-default-rtdb.asia-southeast1.firebasedatabase.app/", fileName = "UserTemperature")
+```
+
+
+## Plot Location of Wifi Packet Sniffer
+```{r}
+#plot(data)
+df <- data.frame(matrix(unlist(data), nrow=length(data), byrow=TRUE))
+colnames(df) <- c("Channel", "MAC", "RSSI", "Timestamp")
+df$Timestamp <- as.POSIXct(df$Timestamp)
+df$Channel <- as.factor(df$Channel)
+df$MAC <- as.factor(df$MAC)
+df$RSSI <- as.integer(df$RSSI)
+
+
+
+```
+
+## Organize Data
+```{r}
+# Organize data into data frame
+
+# Remove null values
+df <- df[!(is.na(df$MAC) | df$MAC=="null"), ]
+df <- df[!(is.na(df$RSSI) | df$RSSI==0), ]
+df <- df[!(is.na(df$Channel) | df$Channel==0), ]
+df <- df[!(is.na(df$Timestamp) | df$Timestamp<'2021-01-01'), ]
+
+# see
+head(df)
+summary(df)
+```
