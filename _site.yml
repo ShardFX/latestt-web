@@ -5,6 +5,8 @@ description: |
    
 theme: mytheme.css
 output_dir: "_site"
+include: ["import.R"]
+exclude: ["docs.txt", "*.csv"]
 navbar:
   right:
     - text: "Home"

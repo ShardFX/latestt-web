@@ -4,9 +4,9 @@ output:
   flexdashboard::flex_dashboard:
     theme: united
     orientation: rows
-    #sodial: ["facebook", "twitter", "linkedin"]
     vertical_layout: fill
-    
+  
+    runtime: shiny  
 ---
 
 ```{r setup, include=FALSE}
@@ -449,7 +449,7 @@ tbl <- reactable::reactable(df_rates,
 library(htmltools)
 htmltools::div(class = "standings", 
   htmltools::div(class = "title",
-    htmltools::h2("Total Number of Covid19 Cases in Malaysia"),
+    htmltools::h2("Total Number of Covid19 Cases by Country"),
     "Clich on the columns names to resort the table"
   ),
   tbl,
@@ -458,3 +458,59 @@ htmltools::div(class = "standings",
 )
 
 ```
+
+Map
+=======================================================================
+
+### **World map of cases** (*use + and - icons to zoom in/out*)
+
+```{r}
+
+library(leaflet)
+library(leafpop)
+library(purrr)
+cv_data_for_plot <- coronavirus %>%
+  
+  ##dplyr::filter(country == "Malaysia") %>%
+  dplyr::filter(cases > 0) %>%
+  dplyr::group_by(country, province, lat, long, type) %>%
+  dplyr::summarise(cases = sum(cases)) %>%
+  dplyr::mutate(log_cases = 2 * log(cases)) %>%
+  dplyr::ungroup()
+
+cv_data_for_plot.split <- cv_data_for_plot %>% split(cv_data_for_plot$type)
+pal <- colorFactor(c("orange", "red", "green"), domain = c("confirmed", "death", "recovered"))
+map_object <- leaflet() %>% addProviderTiles(providers$Stamen.Toner)
+names(cv_data_for_plot.split) %>%
+  purrr::walk(function(df) {
+    map_object <<- map_object %>%
+      addCircleMarkers(
+        data = cv_data_for_plot.split[[df]],
+        lng = ~long, lat = ~lat,
+        
+        color = ~ pal(type),
+        stroke = FALSE,
+        fillOpacity = 0.8,
+        radius = ~log_cases,
+        popup = leafpop::popupTable(cv_data_for_plot.split[[df]],
+          feature.id = FALSE,
+          row.numbers = FALSE,
+          zcol = c("type", "cases", "country", "province")
+        ),
+        group = df,
+       
+        labelOptions = labelOptions(
+          noHide = F,
+          direction = "auto"
+        )
+      )
+  })
+
+map_object %>%
+  addLayersControl(
+    overlayGroups = names(cv_data_for_plot.split),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+```
+
+
