@@ -1,0 +1,1022 @@
+---
+title: "DASHBOARD"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: united
+    orientation: rows
+    vertical_layout: scroll
+  html_document: 
+      toc: true 
+      self_contained: true 
+  github_document: 
+      toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
+
+```{r, include=FALSE}
+#------------------ Packages ------------------
+library(flexdashboard)
+# install.packages("devtools")
+# devtools::install_github("RamiKrispin/coronavirus", force = TRUE)
+library(coronavirus)
+library(shiny)
+library(tidyverse)
+data(coronavirus)
+# update_datasets()
+# View(coronavirus)
+# max(coronavirus$date)
+
+`%>%` <- magrittr::`%>%`
+#------------------ Parameters ------------------
+# Set colors
+confirmed_color <- "yellow"
+active_color <- "#1f77b4"
+recovered_color <- "forestgreen"
+death_color <- "red"
+#------------------ Data ------------------
+
+
+df <- coronavirus %>%
+  # dplyr::filter(date == max(date)) %>%
+  dplyr::filter(country == "Malaysia") %>%
+  dplyr::group_by(country, type) %>%
+  dplyr::summarise(total = sum(cases)) %>%
+  tidyr::pivot_wider(
+    names_from = type,
+    values_from = total
+  ) %>%
+  # dplyr::mutate(unrecovered = confirmed - ifelse(is.na(recovered), 0, recovered) - ifelse(is.na(death), 0, death)) %>%
+  dplyr::mutate(unrecovered = confirmed - ifelse(is.na(death), 0, death)) %>%
+  dplyr::arrange(-confirmed) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(country = dplyr::if_else(country == "United Arab Emirates", "UAE", country)) %>%
+  dplyr::mutate(country = dplyr::if_else(country == "Mainland China", "China", country)) %>%
+  dplyr::mutate(country = dplyr::if_else(country == "North Macedonia", "N.Macedonia", country)) %>%
+  dplyr::mutate(country = trimws(country)) %>%
+  dplyr::mutate(country = factor(country, levels = country))
+
+df_daily <- coronavirus %>%
+  dplyr::filter(country == "Malaysia") %>%
+  dplyr::group_by(date, type) %>%
+  dplyr::summarise(total = sum(cases, na.rm = TRUE)) %>%
+  tidyr::pivot_wider(
+    names_from = type,
+    values_from = total
+  ) %>%
+  dplyr::arrange(date) %>%
+  dplyr::ungroup() %>%
+  #dplyr::mutate(active = confirmed - death - recovered) %>%
+  dplyr::mutate(active = confirmed - death) %>%
+  dplyr::mutate(
+    confirmed_cum = cumsum(confirmed),
+    death_cum = cumsum(death),
+    recovered_cum = cumsum(recovered),
+    active_cum = cumsum(active)
+  )
+
+df_tree <- coronavirus %>%
+  #dplyr::filter(country == "Malaysia") %>%
+  dplyr::group_by(country, type) %>%
+  dplyr::summarise(total = sum(cases), .groups = "drop") %>%
+  dplyr::mutate(type = ifelse(type == "confirmed", "Confirmed", type),
+                type = ifelse(type == "recovered", "Recovered", type),
+                type = ifelse(type == "death", "Death", type)) %>%
+  tidyr::pivot_wider(names_from = type, values_from = total) %>%
+  dplyr::mutate(Active = Confirmed - Death - Recovered) %>%
+  tidyr::pivot_longer(cols = -country, names_to = "type", values_to = "total")
+
+df_world <- df_tree %>%
+  dplyr::group_by(type) %>%
+  dplyr::summarise(total = sum(total), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = type, values_from = total)
+
+names(df_world) <- tolower(names(df_world))
+
+
+df1 <- coronavirus %>% dplyr::filter(date == max(date))
+```
+
+Daily Statistics
+=======================================================================
+
+Row {data-width=400}
+-----------------------------------------------------------------------
+
+### confirmed {.value-box}
+
+```{r}
+
+valueBox(
+  value = paste(format(sum(df$confirmed), big.mark = ","), "", sep = " "),
+  caption = "Total confirmed cases",
+  icon = "fas fa-user-md",
+  color = confirmed_color
+)
+
+```
+
+
+### recovered {.value-box}
+
+```{r}
+valueBox(value = paste(format(df$recovered[1] , big.mark = ","), " (",
+                       round(100 * df$recovered[1] / df$confirmed[1], 1), 
+                       "%)", sep = ""), 
+         caption = "Recovered Cases", icon = "fas fa-heartbeat", 
+         color = recovered_color)
+```
+
+### death {.value-box}
+
+```{r}
+
+valueBox(
+  value = paste(format(sum(df$death, na.rm = TRUE), big.mark = ","), " (",
+    round(100 * sum(df$death, na.rm = TRUE) / sum(df$confirmed), 1),
+    "%)",
+    sep = ""
+  ),
+  caption = "Death cases (death rate)",
+  icon = "fas fa-heart-broken",
+  color = death_color
+)
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+### **Daily cumulative cases by type** (Malaysia)
+    
+```{r}
+plotly::plot_ly(data = df_daily) %>%
+
+  
+  plotly::add_trace(
+    x = ~date,
+    y = ~active_cum,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Active",
+    line = list(color = active_color),
+    marker = list(color = active_color)
+  ) %>%
+  
+  plotly::add_trace(
+    x = ~date,
+    y = ~recovered_cum,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Recovered",
+    line = list(color = recovered_color),
+    marker = list(color = recovered_color)
+  ) %>%
+  
+  
+  plotly::add_trace(
+    x = ~date,
+    y = ~death_cum,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Death",
+    line = list(color = death_color),
+    marker = list(color = death_color)
+  ) %>%
+  
+  
+  plotly::add_annotations(
+    x = as.Date("2020-03-11"),
+    y = 3,
+    text = paste("First death"),
+    xref = "x",
+    yref = "y",
+    arrowhead = 5,
+    arrowhead = 3,
+    arrowsize = 1,
+    showarrow = TRUE,
+    ax = -90,
+    ay = -90
+  ) %>%
+  plotly::add_annotations(
+    x = as.Date("2020-03-18"),
+    y = 14,
+    text = paste(
+      "Lockdown"
+    ),
+    xref = "x",
+    yref = "y",
+    arrowhead = 5,
+    arrowhead = 3,
+    arrowsize = 1,
+    showarrow = TRUE,
+    ax = -10,
+    ay = -90
+  ) %>%
+  plotly::layout(
+    title = "",
+    yaxis = list(title = "Cumulative number of cases"),
+    xaxis = list(title = "Date"),
+    legend = list(x = 0.1, y = 0.9),
+    hovermode = "compare"
+  )
+```
+
+Comparison
+=======================================================================
+
+
+Column {data-width=400}
+-------------------------------------
+
+
+### **Daily new cases**
+    
+```{r}
+daily_confirmed <- coronavirus %>%
+  dplyr::filter(type == "confirmed") %>%
+  dplyr::filter(date >= "2020-02-29") %>%
+  dplyr::mutate(country = country) %>%
+  dplyr::group_by(date, country) %>%
+  dplyr::summarise(total = sum(cases)) %>%
+  dplyr::ungroup() %>%
+  tidyr::pivot_wider(names_from = country, values_from = total)
+
+#----------------------------------------
+# Plotting the data
+
+daily_confirmed %>%
+  plotly::plot_ly() %>%
+  plotly::add_trace(
+    x = ~date,
+    y = ~Malaysia,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Malaysia"
+  ) %>%
+  plotly::add_trace(
+    x = ~date,
+    y = ~Brunei,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Brunei"
+  ) %>%
+  plotly::add_trace(
+    x = ~date,
+    y = ~Singapore,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Singapore"
+  ) %>%
+  plotly::add_trace(
+    x = ~date,
+    y = ~Thailand,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Thailand"
+  ) %>%
+  plotly::layout(
+    title = "",
+    legend = list(x = 0.1, y = 0.9),
+    yaxis = list(title = "Number of new cases"),
+    xaxis = list(title = "Date"),
+    # paper_bgcolor = "black",
+    # plot_bgcolor = "black",
+    # font = list(color = 'white'),
+    hovermode = "compare",
+    margin = list(
+      # l = 60,
+      # r = 40,
+      b = 10,
+      t = 10,
+      pad = 2
+    )
+  )
+```
+
+
+ Row
+-----------------------------------------------------------------------
+
+### **Cases distribution by type**
+
+```{r daily_summary}
+df_EU <- coronavirus %>%
+  # dplyr::filter(date == max(date)) %>%
+  dplyr::filter(country == "Malaysia" |
+    country == "Brunei" |
+    country == "Singapore" |
+    country == "Thailand") %>%
+  dplyr::group_by(country, type) %>%
+  dplyr::summarise(total = sum(cases)) %>%
+  tidyr::pivot_wider(
+    names_from = type,
+    values_from = total
+  ) %>%
+  # dplyr::mutate(unrecovered = confirmed - ifelse(is.na(recovered), 0, recovered) - ifelse(is.na(death), 0, death)) %>%
+  dplyr::mutate(unrecovered = confirmed - ifelse(is.na(death), 0, death)) %>%
+  dplyr::arrange(confirmed) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(country = dplyr::if_else(country== "United Arab Emirates", "UAE", country)) %>%
+  dplyr::mutate(country = dplyr::if_else(country == "Mainland China", "China", country)) %>%
+  dplyr::mutate(country = dplyr::if_else(country == "North Macedonia", "N.Macedonia", country)) %>%
+  dplyr::mutate(country = trimws(country)) %>%
+  dplyr::mutate(country = factor(country, levels = country))
+
+plotly::plot_ly(
+  data = df_EU,
+  x = ~country,
+  # y = ~unrecovered,
+  y = ~ confirmed,
+  # text =  ~ confirmed,
+  # textposition = 'auto',
+  type = "bar",
+  name = "Confirmed",
+  marker = list(color = active_color)
+) %>%
+  plotly::add_trace(
+    y = ~death,
+    # text =  ~ death,
+    # textposition = 'auto',
+    name = "Death",
+    marker = list(color = death_color)
+  ) %>%
+  plotly::layout(
+    barmode = "stack",
+    yaxis = list(title = "Total cases"),
+    xaxis = list(title = ""),
+    hovermode = "compare",
+    margin = list(
+      # l = 60,
+      # r = 40,
+      b = 10,
+      t = 10,
+      pad = 2
+    )
+  )
+```
+
+Recovery/Death Ratio
+=======================================================================
+
+
+Column {data-width=400}
+-------------------------------------
+
+### Recovery/Death Ratio
+
+```{r}
+
+coronavirus %>% 
+  
+  dplyr::group_by(country, type) %>%
+  dplyr::summarise(total_cases = sum(cases)) %>%
+  tidyr::pivot_wider(names_from = type, values_from = total_cases) %>%
+  dplyr::arrange(- confirmed) %>%
+  dplyr::filter(confirmed >= 20000) %>%
+  dplyr::mutate(recover_rate = recovered / confirmed,
+                death_rate = death / confirmed) %>% 
+  dplyr::mutate(recover_rate = dplyr::if_else(is.na(recover_rate), 0, recover_rate),
+                death_rate = dplyr::if_else(is.na(death_rate), 0, death_rate)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(confirmed_normal = as.numeric(confirmed) / max(as.numeric(confirmed))) %>%
+  plotly::plot_ly(y = ~ round(100 * recover_rate, 1),
+                  x = ~ round(100 * death_rate, 1),
+                  size = ~  log(confirmed),
+                  sizes = c(5, 70),
+                  type = 'scatter', mode = 'markers',
+                  color = ~ country,
+                  marker = list(sizemode = 'diameter' , opacity = 0.5),
+                  hoverinfo = 'text',
+                  text = ~paste("", country, 
+                                " Confirmed Cases: ", confirmed,
+                                " Recovery Rate: ", paste(round(100 * recover_rate, 1), "%", sep = ""),
+                                " Death Rate: ",  paste(round(100 * death_rate, 1), "%", sep = ""))
+                 ) %>%
+  plotly::layout(title = "Recovery / Death Ratio (Countries with More than 20,000 Cases)",
+    yaxis = list(title = "Recovery Rate", ticksuffix = "%"),
+                xaxis = list(title = "Death Rate", ticksuffix = "%", 
+                             dtick = 1, 
+                             tick0 = 0),
+                hovermode = "compare")
+```
+
+Summary
+=======================================================================
+
+
+Column {data-width=400}
+-------------------------------------
+### Data
+
+
+```{r}
+df_rates <- df_tree %>%
+  dplyr::filter(type != "Active") %>%
+  tidyr::pivot_wider(names_from = "type", values_from = "total") %>%
+  dplyr::mutate(recovery_rate = Recovered / Confirmed,
+    death_rate = Death / Confirmed) 
+
+
+bar_chart <- function(label, width = "100%", height = "14px", fill = "#00bfc4", background = NULL) {
+  bar <- htmltools::div(style = list(background = fill, width = width, height = height))
+  chart <- htmltools::div(style = list(flexGrow = 1, marginLeft = "6px", background = background), bar)
+  htmltools::div(style = list(display = "flex", alignItems = "center"), label, chart)
+}
+
+tbl <- reactable::reactable(df_rates,
+                     pagination = FALSE,
+                     highlight = TRUE,
+                     height = 400,
+                     sortable = TRUE,
+                     borderless = TRUE,
+                     defaultPageSize = nrow(df_rates),
+                      defaultSortOrder = "desc",
+                     defaultSorted = "Confirmed",
+                     columns = list(
+                       country = reactable::colDef(name = "Country", minWidth = 50, maxWidth = 100),
+                       Confirmed = reactable::colDef(name = "Confirmed",  minWidth = 50, maxWidth = 100, defaultSortOrder = "desc"),
+                       Recovered = reactable::colDef(name = "Recovered",  minWidth = 50, maxWidth = 100),
+                       Death = reactable::colDef(name = "Death",  minWidth = 50, maxWidth = 100),
+                       recovery_rate = reactable::colDef(name = "Recovery Rate",  minWidth = 50, maxWidth = 200,
+                                                        defaultSortOrder = "desc",
+                                                      cell = function(value) {
+                                                        # Format as percentages with 1 decimal place
+                                                        value <- paste0(format(round(value * 100, 2), nsmall = 1), "%")
+                                                        bar_chart(value, width = value, fill = "green", background = "#e1e1e1")
+                                                      },
+                       align = "left"),
+                       death_rate = reactable::colDef(name = "Death Rate",  
+                                                      minWidth = 50, maxWidth = 200,
+                                                      defaultSortOrder = "desc",
+                                                      cell = function(value) {
+                                                        # Format as percentages with 1 decimal place
+                                                        value <- paste0(format(round(value * 100, 2), nsmall = 1), "%")
+                                                        bar_chart(value, width = value, fill = "red", background = "#e1e1e1")
+                                                      },
+                       align = "left"))
+)
+
+library(htmltools)
+htmltools::div(class = "standings", 
+  htmltools::div(class = "title",
+    htmltools::h2("Total Number of Covid19 Cases by Country"),
+    "Clich on the columns names to resort the table"
+  ),
+  tbl,
+  paste("",
+  "Data last updated on", max(df1$date))
+)
+
+```
+
+Data Visualization
+=======================================================================
+
+
+Row
+-------------------------------------
+
+
+```{r, include=FALSE, message=FALSE}
+## Setup
+##setwd("C:/UTP/Semester 8 - May 2021/EDB4703 - Systems Integration Design Project")
+
+library(fireData)
+library(plotly)
+library(tidyverse)
+#library(data.table)
+#library(rsconnect)
+library(Amelia)
+library("imputeTS")
+library(tidyquant)
+```
+
+```{r, include=FALSE}
+# Firebase
+token <- anonymous_login(project_api = "AIzaSyCUP3n1nPRtkOsdxiEJO_onqUkTCUCRV1E")
+
+# MapBox
+mapboxToken <- "pk.eyJ1Ijoic2hhcmRmeCIsImEiOiJja3F5NW92ODMxNTFrMm5sZmZ6aHRydWx6In0.3nyrkR9ke5BF9TPK0rg29g"
+Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+
+```
+
+
+```{r, include=FALSE}
+data <- download(projectURL = "https://dashboard-b4f45-default-rtdb.asia-southeast1.firebasedatabase.app/", fileName = "BluetoothDetection")
+```
+
+### Plot Location of Wifi Packet Sniffer
+```{r}
+#plot(data)
+df <- data.frame(matrix(unlist(data), nrow=length(data), byrow=TRUE))
+colnames(df) <- c("bluetooth","latitude","longitude", "name", "rssi", "timestamp", "uid")
+
+df$bluetooth <- as.factor(df$bluetooth)
+df$latitude <- as.double(df$latitude)
+df$longitude <- as.double(df$longitude)
+df$name <- as.factor(df$name)
+df$rssi <- as.double(df$rssi)
+df$timestamp <- as.POSIXct(df$timestamp)
+df$uid <- as.factor(df$uid)
+
+# Remove null values
+df <- df[!(is.na(df$bluetooth) | df$bluetooth==""), ]
+df <- df[!(is.na(df$latitude) | df$latitude==0), ]
+df <- df[!(is.na(df$longitude) | df$longitude==0), ]
+df <- df[!(is.na(df$name) | df$name==""), ]
+df <- df[!(is.na(df$rssi) | df$rssi==0), ]
+df <- df[!(is.na(df$timestamp) | df$timestamp<'2021-01-01'), ]
+df <- df[!(is.na(df$uid) | df$uid=="null"), ]
+
+summary(df)
+```
+
+### Plot Frequency of Detected Proximity
+```{r}
+# Frequency of names
+fig <- plot_ly(data = df, x = df$bluetooth, type="histogram", color=df$name)
+fig <- fig %>% layout(title = 'Frequency of Detected Proximity',
+         xaxis = list(title = 'Names'),
+         yaxis = list(title = 'Frequency')
+         )
+fig
+```
+
+Row
+-------------------------------------
+
+
+```{r}
+#plot(data)
+
+# maps
+dat <- map_data("world", "Malaysia") 
+dat <- dat %>% group_by(group)
+
+
+map <- df %>% plot_mapbox(lat = ~latitude, lon = ~longitude, size=2,
+              mode = 'scattermapbox',  text = ~paste("Time: ", timestamp, "<br>Proximity of:", bluetooth), color=~name)
+map <- map %>% layout(
+         title = 'Proximity Detection Map History',
+         dragmode=FALSE,
+         mapbox=list(
+              style="carto-positron",
+              zoom =4.2,
+              center=list(lon=108, lat=4.8))
+         ) 
+
+map <- map %>% config(mapboxAccessToken = Sys.getenv("MAPBOX_TOKEN"))
+
+map
+```
+
+```{r, include=FALSE, message=FALSE}
+## Setup
+##setwd("C:/UTP/Semester 8 - May 2021/EDB4703 - Systems Integration Design Project")
+
+library(fireData)
+library(plotly)
+library(tidyverse)
+#library(data.table)
+#library(rsconnect)
+library(Amelia)
+library("imputeTS")
+library(tidyquant)
+```
+
+```{r, include=FALSE}
+# Firebase
+token <- anonymous_login(project_api = "AIzaSyCUP3n1nPRtkOsdxiEJO_onqUkTCUCRV1E")
+
+# MapBox
+mapboxToken <- "pk.eyJ1Ijoic2hhcmRmeCIsImEiOiJja3F5NW92ODMxNTFrMm5sZmZ6aHRydWx6In0.3nyrkR9ke5BF9TPK0rg29g"
+Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+
+```
+
+```{r, include=FALSE}
+data <- download(projectURL = "https://dashboard-b4f45-default-rtdb.asia-southeast1.firebasedatabase.app/", fileName = "UserLocation")
+```
+
+### Plot Location History
+```{r}
+#plot(data)
+df <- data.frame(matrix(unlist(data), nrow=length(data), byrow=TRUE))
+colnames(df) <- c("latitude","longitude", "name", "timestamp", "uid")
+df$latitude <- as.double(df$latitude)
+df$longitude <- as.double(df$longitude)
+df$name <- as.factor(df$name)
+df$timestamp <- as.POSIXct(df$timestamp)
+df$uid <- as.factor(df$uid)
+
+# Remove null values
+df <- df[!(is.na(df$latitude) | df$latitude==0), ]
+df <- df[!(is.na(df$longitude) | df$longitude==0), ]
+df <- df[!(is.na(df$name) | df$name=="null"), ]
+df <- df[!(is.na(df$timestamp) | df$timestamp<'2021-01-01'), ]
+df <- df[!(is.na(df$uid) | df$uid=="null"), ]
+
+summary(df)
+```
+
+### Plot Frequency of names
+```{r}
+# Frequency of names
+fig <- plot_ly(data = df, x = df$name, type="histogram")
+fig <- fig %>% layout(title = 'Frequency of Names',
+         xaxis = list(title = 'Names'),
+         yaxis = list(title = 'Frequency')
+         )
+fig
+```
+
+Row
+-------------------------------------
+```{r}
+#plot(data)
+
+# maps
+dat <- map_data("world", "Malaysia") 
+dat <- dat %>% group_by(group)
+
+
+map <- df %>% plot_mapbox(lat = ~latitude, lon = ~longitude, size=2,
+              mode = 'scattermapbox',  text = ~paste("Time: ", timestamp, "<br>UID:", uid), color=~name)
+map <- map %>% layout(
+         title = 'User Location History',
+         dragmode=FALSE,
+         mapbox=list(
+              style="carto-positron",
+              zoom =4.2,
+              center=list(lon=108, lat=4.8))
+         ) 
+
+map <- map %>% config(mapboxAccessToken = Sys.getenv("MAPBOX_TOKEN"))
+
+map
+```
+
+```{r, include=FALSE, message=FALSE}
+## Setup
+##setwd("C:/UTP/Semester 8 - May 2021/EDB4703 - Systems Integration Design Project")
+
+library(fireData)
+library(plotly)
+library(tidyverse)
+#library(data.table)
+#library(rsconnect)
+library(Amelia)
+library("imputeTS")
+library(tidyquant)
+```
+
+```{r, include=FALSE}
+# Firebase
+token <- anonymous_login(project_api = "AIzaSyCUP3n1nPRtkOsdxiEJO_onqUkTCUCRV1E")
+
+# MapBox
+mapboxToken <- "pk.eyJ1Ijoic2hhcmRmeCIsImEiOiJja3F5NW92ODMxNTFrMm5sZmZ6aHRydWx6In0.3nyrkR9ke5BF9TPK0rg29g"
+Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+
+# ShinyApps
+#rsconnect::setAccountInfo(name='shardfx',
+#			  token='37C7FD76A2B2205839A192482758244E',
+#			  secret='0mc41UMNDOm0o1giVSkt5bEj7ubN08RdGSd6204C')
+```
+
+```{r, include=FALSE}
+data <- download(projectURL = "https://dashboard-b4f45-default-rtdb.asia-southeast1.firebasedatabase.app/", fileName = "UserTemperature")
+```
+
+```{r}
+#plot(data)
+df3 <- data.frame(matrix(unlist(data), nrow=length(data), byrow=TRUE))
+colnames(df) <- c("Channel", "MAC", "RSSI", "Timestamp")
+df$Timestamp <- as.POSIXct(df$Timestamp)
+df$Channel <- as.factor(df$Channel)
+df$MAC <- as.factor(df$MAC)
+df$RSSI <- as.integer(df$RSSI)
+
+```
+
+### Organize Data
+```{r}
+# Organize data into data frame
+
+# Remove null values
+df3 <- df3[!(is.na(df$MAC) | df$MAC=="null"), ]
+df3 <- df3[!(is.na(df$RSSI) | df$RSSI==0), ]
+df3 <- df3[!(is.na(df$Channel) | df$Channel==0), ]
+df3 <- df3[!(is.na(df$Timestamp) | df$Timestamp<'2021-01-01'), ]
+
+# see
+head(df)
+summary(df)
+```
+
+
+```{r, include=FALSE}
+# Firebase
+token <- anonymous_login(project_api = "AIzaSyCUP3n1nPRtkOsdxiEJO_onqUkTCUCRV1E")
+
+# MapBox
+mapboxToken <- "pk.eyJ1Ijoic2hhcmRmeCIsImEiOiJja3F5NW92ODMxNTFrMm5sZmZ6aHRydWx6In0.3nyrkR9ke5BF9TPK0rg29g"
+Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+
+# ShinyApps
+#rsconnect::setAccountInfo(name='shardfx',
+#			  token='37C7FD76A2B2205839A192482758244E',
+#			  secret='0mc41UMNDOm0o1giVSkt5bEj7ubN08RdGSd6204C')
+```
+
+```{r, include=FALSE}
+data <- download(projectURL = "https://dashboard-b4f45-default-rtdb.asia-southeast1.firebasedatabase.app/", fileName = "WiFiPacketSniffer")
+
+location <- download(projectURL = "https://dashboard-b4f45-default-rtdb.asia-southeast1.firebasedatabase.app/", fileName = "WiFiLocation")
+```
+
+
+### Plot Location of Wifi Packet Sniffer
+```{r}
+#plot(data)
+df <- data.frame(location)
+
+# maps
+dat <- map_data("world", "Malaysia") 
+dat <- dat %>% group_by(group)
+
+
+map <- df %>% plot_mapbox(lat = ~Latitude, lon = ~Longitude, size=2,
+              mode = 'scattermapbox') 
+map <- map %>% layout(
+         title = 'WiFi Packet Sniffer Location(s)',
+         dragmode=FALSE,
+         mapbox=list(
+              style="carto-positron",
+              zoom =4.2,
+              center=list(lon=108, lat=4.8))
+         ) 
+
+map <- map %>% config(mapboxAccessToken = Sys.getenv("MAPBOX_TOKEN"))
+
+map
+```
+
+Row
+-------------------------------------
+
+### Organize Data
+```{r}
+# Organize data into data frame
+df2 <- data.frame(matrix(unlist(data), nrow=length(data), byrow=TRUE))
+colnames(df2) <- c("Channel", "MAC", "RSSI", "Timestamp")
+df2$Timestamp <- as.POSIXct(df2$Timestamp)
+df2$Channel <- as.factor(df2$Channel)
+df2$MAC <- as.factor(df2$MAC)
+df2$RSSI <- as.integer(df2$RSSI)
+
+# Remove null values
+df2 <- df2[!(is.na(df2$MAC) | df2$MAC=="null"), ]
+df2 <- df2[!(is.na(df2$RSSI) | df2$RSSI==0), ]
+df2 <- df2[!(is.na(df2$Channel) | df2$Channel==0), ]
+df2 <- df2[!(is.na(df2$Timestamp) | df2$Timestamp<'2021-01-01'), ]
+
+# see
+head(df2)
+summary(df2)
+```
+```{r}
+#ggplot_na_distribution(x = df3$`n_distinct(MAC)`, x_axis_labels = df3$Timestamp)
+```
+
+
+### Plot of Probe Request Frequency vs Channel
+```{r}
+# Frequency of detected probe requests by channel
+fig <- plot_ly(data = df2, x = df2$Channel, type="histogram")
+fig <- fig %>% layout(title = 'Frequency of Detected Probe Requests by Channel',
+         xaxis = list(title = 'Channel'),
+         yaxis = list(title = 'Frequency')
+         )
+fig
+```
+
+### Plot of Probe Request Frequency vs RSSI
+```{r}
+# Frequency of detected probe requests by RSSI
+fig2 <- plot_ly(data = df2, x = df2$RSSI, type="histogram")
+fig2 <- fig2 %>% layout(title = 'Frequency of Detected Probe Requests by RSSI',
+         xaxis = list(title = 'RSSI'),
+         yaxis = list(title = 'Frequency')
+         )
+fig2
+```
+
+Row
+-------------------------------------
+
+### Plot of Frequency vs Time
+```{r}
+#a <- as.numeric(as.Date(min(df2$Timestamp))) * 24 * 60 * 60 * 1000
+#b <- as.numeric(as.Date(max(df2$Timestamp))) * 24 * 60 * 60 * 1000
+
+# Frequency of detected probe requests by time
+fig3 <- plot_ly(df2, x = df2$Timestamp, type="histogram", histfunc='sum', nbinsx = 24*60*2)
+fig3 <- fig3 %>% layout(title = list(text='Frequency of Detected Probe Requests by Time'),
+         xaxis = list(title = 'Timestamp', range=c(min(df2$Timestamp), max(df2$Timestamp))),
+         yaxis = list(title = 'Frequency')
+         )
+#fig3 <- fig3 %>% layout(yaxis=list(type='linear'))
+fig3 <- fig3 %>% layout(
+    xaxis = list(
+      rangeselector = list(
+        buttons = list(
+          list(
+            count = 30,
+            label = "30m",
+            step = "minute",
+            stepmode = "backward"),
+          list(
+            count = 1,
+            label = "1h",
+            step = "hour",
+            stepmode = "backward"),
+          list(
+            count = 8,
+            label = "8h",
+            step = "hour",
+            stepmode = "backward"),
+          list(
+            count = 24,
+            label = "1 day",
+            step = "hour",
+            stepmode = "backward"),
+          list(
+            count = 7,
+            label = "1 week",
+            step = "day",
+            stepmode = "backward"),
+          list(
+            count = 1,
+            label = "1 month",
+            step = "Month",
+            stepmode = "backward"))),
+          rangeslider = list(type = "date"))
+        )
+    
+fig3
+```
+
+
+
+
+```{r}
+library(dplyr)
+library(lubridate)
+
+df3 <- df2
+df3$Channel <- NULL
+df3$RSSI <- NULL
+
+df4 <- df3
+df5 <- df4
+df6 <- df5
+
+# 5 minutes
+df3$Timestamp <- as.POSIXct(df3$Timestamp)
+df3$Timestamp <- round_date(df3$Timestamp, '5 minutes')
+df3 <- df3 %>% group_by(Timestamp) %>% summarise(n_distinct(MAC))
+
+# 30 minutes
+df4$Timestamp <- round_date(df4$Timestamp, '30 minutes')
+df4 <- df4 %>% group_by(Timestamp) %>% summarise(n_distinct(MAC))
+
+# 4 hour
+df5$Timestamp <- round_date(df5$Timestamp, '4 hours')
+df5 <- df5 %>% group_by(Timestamp) %>% summarise(n_distinct(MAC))
+
+# 12 hour
+df6$Timestamp <- round_date(df6$Timestamp, '12 hours')
+df6 <- df6 %>% group_by(Timestamp) %>% summarise(n_distinct(MAC))
+
+
+```
+
+ Row
+-----------------------------------------------------------------------
+
+```{r}
+theme_set(theme_classic())
+min <- as_datetime(min(df2$Timestamp))
+min <- round_date(min, '1 hour')
+lasthour <- max(df2$Timestamp) - 3600
+lasthour <- round_date(lasthour, '1 hour')
+lastday <- max(df2$Timestamp) - 86400
+lastday <- round_date(lastday, '1 hour')
+last3days <- max(df2$Timestamp) - (86400*3)
+last3days <- round_date(last3days, '1 hour')
+lastweek <- max(df2$Timestamp) - 604800
+lastweek <- round_date(lastweek, '1 hour')
+#lastmonth <- max(df2$Timestamp) - 2629743
+max <- max(df2$Timestamp)
+max <- round_date(max, '1 hour')
+
+
+#ggplot(df6, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(min, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) 
+
+#ggplot(df5, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(min, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) 
+
+#ggplot(df4, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(min, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) 
+
+p1 <- ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(min, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50)) + labs(title = "Frequency over Time")
+
+#ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(lastweek, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50))
+
+#ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "4 hours", date_labels = "%b-%d %H:%M", limits = c(last3days, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50))
+
+p2 <- ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 hour", date_labels = "%b-%d %H:%M", limits = c(lastday, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,40)) + labs(title = "Frequency over 1 Day")
+
+p1
+p2
+
+```
+
+ Row
+-----------------------------------------------------------------------
+
+```{r}
+p3 <- ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_histogram(stat="identity") + scale_x_datetime(date_breaks = "5 min", date_labels = "%b-%d %H:%M", limits = c(lasthour, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) + labs(title = "Frequency over last hour")
+
+p4 <- ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`))  + geom_point(size = 0.3, alpha=0.25) + scale_x_datetime(date_breaks = "12 hour", date_labels = "%b-%d %H:%M", limits = c(lastweek, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1))  + labs(title = "Frequency over last week") +  scale_y_continuous(limits=c(0,40)) + geom_ma(ma_fun = SMA, n = 30, color = "red", size = 1)
+ 
+#j15 <- as.POSIXct("2021-07-15 12:00:00 +8")
+#j16 <- as.POSIXct("2021-07-16 12:00:00 +8")
+#ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "2 hour", date_labels = "%m/%d %H:%M", limits = c(j15, j16)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50))
+
+# ggplotly(p1)%>%layout(
+#  margin = list(b = 100, l = 100,r = 150))
+# 
+# ggplotly(p2)%>%layout(
+#  margin = list(b = 100, l = 100,r = 150))
+# 
+# ggplotly(p3)%>%layout(
+#  margin = list(b = 100, l = 100,r = 150))
+# 
+# ggplotly(p4)%>%layout(
+#  margin = list(b = 100, l = 100,r = 150))
+
+#print(ggplotly(p1))
+#print(ggplotly(p2))
+#print(ggplotly(p3))
+#print(ggplotly(p4))
+
+#print(p1)
+#print(p2)
+#print(p3)
+#print(p4)
+
+# plotOutput("p1")
+# plotOutput("p2")
+# plotOutput("p3")
+# plotOutput("p4")
+
+
+p3
+p4
+
+```
+
+```{r}
+distinctMAC <- n_distinct(df2$MAC)
+```
+
+ Row
+-----------------------------------------------------------------------
+
+```{r, fig.width=14, fig.height=7}
+df7 <- df4
+df7$time <-  format(as.POSIXct(df4$Timestamp), format = "%H:%M") 
+df8 <- df7
+
+df7 <- df7 %>% group_by(time) %>% summarise(median(`n_distinct(MAC)`))
+colnames(df7) <- c("time", "median")
+df8 <- df8 %>% group_by(time) %>% summarise(mean(`n_distinct(MAC)`))
+colnames(df8) <- c("time", "mean")
+
+p5 <- ggplot(df7, aes(x=time, y=median)) + geom_histogram(stat="identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Median of MAC over Time 00:00 AM to 11:59 PM")
+
+p6 <- ggplot(df8, aes(x=time, y=mean)) + geom_histogram(stat="identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Mean of MAC over Time 00:00 AM to 11:59 PM")
+
+#print(ggplotly(p5))
+#print(ggplotly(p6))
+
+p5
+p6
+
+#+ scale_x_time(date_breaks = "5 min", date_labels = "%b-%d %H:%M", limits = c(lasthour, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) 
+```
+

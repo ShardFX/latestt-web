@@ -5,7 +5,7 @@ description: |
    
 theme: mytheme.css
 output_dir: "_site"
-include: ["import.R"]
+include: ["import.R", "Dashboard.Rmd", "about.Rmd", "index.Rmd", ".Rhistory", ".Rproj.user"]
 exclude: ["docs.txt", "*.csv"]
 navbar:
   right:
@@ -21,5 +21,6 @@ navbar:
       href: https://myaccount.google.com 
       
       
-output: distill::distill_article
+output: distill::distill_article 
+    
 

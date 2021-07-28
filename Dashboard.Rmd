@@ -5,15 +5,25 @@ output:
     theme: united
     orientation: rows
     vertical_layout: scroll
-  
+  html_document: 
+      toc: true 
+      self_contained: true 
+  github_document: 
+      toc: true
 ---
 
 ```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
+
+```{r, include=FALSE}
 #------------------ Packages ------------------
 library(flexdashboard)
 # install.packages("devtools")
 # devtools::install_github("RamiKrispin/coronavirus", force = TRUE)
 library(coronavirus)
+library(shiny)
+library(tidyverse)
 data(coronavirus)
 # update_datasets()
 # View(coronavirus)
@@ -286,6 +296,9 @@ daily_confirmed %>%
   )
 ```
 
+
+ Row
+-----------------------------------------------------------------------
 
 ### **Cases distribution by type**
 
@@ -858,6 +871,9 @@ fig3 <- fig3 %>% layout(
 fig3
 ```
 
+
+
+
 ```{r}
 library(dplyr)
 library(lubridate)
@@ -890,6 +906,8 @@ df6 <- df6 %>% group_by(Timestamp) %>% summarise(n_distinct(MAC))
 
 ```
 
+ Row
+-----------------------------------------------------------------------
 
 ```{r}
 theme_set(theme_classic())
@@ -914,29 +932,70 @@ max <- round_date(max, '1 hour')
 
 #ggplot(df4, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(min, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) 
 
-ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(min, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50)) + labs(title = "Frequency over Time")
+p1 <- ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(min, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50)) + labs(title = "Frequency over Time")
 
 #ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 day", date_labels = "%b-%d %H:%M", limits = c(lastweek, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50))
 
 #ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "4 hours", date_labels = "%b-%d %H:%M", limits = c(last3days, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50))
 
-ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 hour", date_labels = "%b-%d %H:%M", limits = c(lastday, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,40)) + labs(title = "Frequency over 1 Day")
+p2 <- ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "1 hour", date_labels = "%b-%d %H:%M", limits = c(lastday, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,40)) + labs(title = "Frequency over 1 Day")
 
+p1
+p2
 
+```
 
-  
-ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_histogram(stat="identity") + scale_x_datetime(date_breaks = "5 min", date_labels = "%b-%d %H:%M", limits = c(lasthour, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) + labs(title = "Frequency over last hour")
+ Row
+-----------------------------------------------------------------------
 
-ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`))  + geom_point(size = 0.3, alpha=0.25) + scale_x_datetime(date_breaks = "12 hour", date_labels = "%b-%d %H:%M", limits = c(lastweek, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1))  + labs(title = "Frequency over last week") +  scale_y_continuous(limits=c(0,40)) + geom_ma(ma_fun = SMA, n = 30, color = "red", size = 1)
+```{r}
+p3 <- ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_histogram(stat="identity") + scale_x_datetime(date_breaks = "5 min", date_labels = "%b-%d %H:%M", limits = c(lasthour, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) + labs(title = "Frequency over last hour")
+
+p4 <- ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`))  + geom_point(size = 0.3, alpha=0.25) + scale_x_datetime(date_breaks = "12 hour", date_labels = "%b-%d %H:%M", limits = c(lastweek, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1))  + labs(title = "Frequency over last week") +  scale_y_continuous(limits=c(0,40)) + geom_ma(ma_fun = SMA, n = 30, color = "red", size = 1)
  
 #j15 <- as.POSIXct("2021-07-15 12:00:00 +8")
 #j16 <- as.POSIXct("2021-07-16 12:00:00 +8")
 #ggplot(df3, aes(x=Timestamp, y=`n_distinct(MAC)`)) + geom_point(size=1) + scale_x_datetime(date_breaks = "2 hour", date_labels = "%m/%d %H:%M", limits = c(j15, j16)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) +  scale_y_continuous(limits=c(0,50))
+
+# ggplotly(p1)%>%layout(
+#  margin = list(b = 100, l = 100,r = 150))
+# 
+# ggplotly(p2)%>%layout(
+#  margin = list(b = 100, l = 100,r = 150))
+# 
+# ggplotly(p3)%>%layout(
+#  margin = list(b = 100, l = 100,r = 150))
+# 
+# ggplotly(p4)%>%layout(
+#  margin = list(b = 100, l = 100,r = 150))
+
+#print(ggplotly(p1))
+#print(ggplotly(p2))
+#print(ggplotly(p3))
+#print(ggplotly(p4))
+
+#print(p1)
+#print(p2)
+#print(p3)
+#print(p4)
+
+# plotOutput("p1")
+# plotOutput("p2")
+# plotOutput("p3")
+# plotOutput("p4")
+
+
+p3
+p4
+
 ```
 
 ```{r}
 distinctMAC <- n_distinct(df2$MAC)
 ```
+
+ Row
+-----------------------------------------------------------------------
 
 ```{r, fig.width=14, fig.height=7}
 df7 <- df4
@@ -948,9 +1007,15 @@ colnames(df7) <- c("time", "median")
 df8 <- df8 %>% group_by(time) %>% summarise(mean(`n_distinct(MAC)`))
 colnames(df8) <- c("time", "mean")
 
-ggplot(df7, aes(x=time, y=median)) + geom_histogram(stat="identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Median of MAC over Time 00:00 AM to 11:59 PM")
+p5 <- ggplot(df7, aes(x=time, y=median)) + geom_histogram(stat="identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Median of MAC over Time 00:00 AM to 11:59 PM")
 
-ggplot(df8, aes(x=time, y=mean)) + geom_histogram(stat="identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Mean of MAC over Time 00:00 AM to 11:59 PM")
+p6 <- ggplot(df8, aes(x=time, y=mean)) + geom_histogram(stat="identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Mean of MAC over Time 00:00 AM to 11:59 PM")
+
+#print(ggplotly(p5))
+#print(ggplotly(p6))
+
+p5
+p6
 
 #+ scale_x_time(date_breaks = "5 min", date_labels = "%b-%d %H:%M", limits = c(lasthour, max)) + theme(axis.text.x = element_text(angle=45, hjust = 1)) 
 ```
